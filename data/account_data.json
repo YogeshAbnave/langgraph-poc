@@ -1,0 +1,40 @@
+{
+  "accounts": {
+    "ACC001": {
+      "account_id": "ACC001",
+      "owner": "Alice Johnson",
+      "email": "alice.johnson@example.com",
+      "phone": "+1-555-0101",
+      "address": "123 Main St, Springfield, IL 62701",
+      "member_since": "2018-03-15",
+      "account_type": "Premium Checking",
+      "current_balance": 1200.50,
+      "minimum_balance": 2500.00,
+      "status": "active"
+    },
+    "ACC002": {
+      "account_id": "ACC002",
+      "owner": "Bob Smith",
+      "email": "bob.smith@example.com",
+      "phone": "+1-555-0202",
+      "address": "456 Oak Ave, Chicago, IL 60601",
+      "member_since": "2020-07-22",
+      "account_type": "Standard Checking",
+      "current_balance": 820.00,
+      "minimum_balance": 500.00,
+      "status": "active"
+    },
+    "ACC003": {
+      "account_id": "ACC003",
+      "owner": "Carol White",
+      "email": "carol.white@example.com",
+      "phone": "+1-555-0303",
+      "address": "789 Pine Rd, Naperville, IL 60540",
+      "member_since": "2019-11-01",
+      "account_type": "Savings",
+      "current_balance": 1100.50,
+      "minimum_balance": 300.00,
+      "status": "active"
+    }
+  }
+}

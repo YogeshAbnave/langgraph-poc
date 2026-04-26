@@ -1,0 +1,24 @@
+{
+  "penalty_rules": {
+    "Premium Checking": {
+      "minimum_balance": 2500.00,
+      "monthly_fee_if_below": 25.00,
+      "description": "Premium Checking requires a $2,500 minimum daily balance. Falling below incurs a $25 monthly maintenance fee."
+    },
+    "Standard Checking": {
+      "minimum_balance": 500.00,
+      "monthly_fee_if_below": 12.00,
+      "description": "Standard Checking requires a $500 minimum daily balance. Falling below incurs a $12 monthly maintenance fee."
+    },
+    "Savings": {
+      "minimum_balance": 300.00,
+      "monthly_fee_if_below": 5.00,
+      "description": "Savings accounts require a $300 minimum balance. Falling below incurs a $5 monthly fee."
+    }
+  },
+  "overdraft_policy": {
+    "fee_per_transaction": 35.00,
+    "linked_account_protection": true,
+    "description": "Overdraft fee is $35 per transaction. Linking a savings account provides automatic overdraft protection."
+  }
+}

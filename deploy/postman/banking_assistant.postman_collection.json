@@ -1,0 +1,412 @@
+{
+  "info": {
+    "name": "Banking Assistant — AgentCore API",
+    "_postman_id": "banking-assistant-agentcore-v1",
+    "description": "Test the Banking Assistant deployed on AWS Bedrock AgentCore Runtime via API Gateway.\n\n## Setup\n1. Set the `base_url` collection variable to your API Gateway endpoint.\n   Example: `https://abc123.execute-api.us-east-2.amazonaws.com`\n2. Run the requests in order or individually.\n\n## Architecture\nPostman → API Gateway → api-gateway-invoker Lambda → AgentCore Runtime → LangGraph Agent → Tool Lambdas",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://bbcwr3ugt1.execute-api.us-east-2.amazonaws.com",
+      "description": "API Gateway endpoint URL (no trailing slash). Update this after deployment."
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "description": "Session ID for multi-turn conversations. Auto-populated by the first request."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "GET /health (not available on prod — use POST /)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Note: The production API Gateway only exposes POST /. This request is for reference — use the local_server.py for health checks during development."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Account Balance Queries",
+      "item": [
+        {
+          "name": "Get Balance — ACC001 (Alice, below minimum)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has response field', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('response');",
+                  "    pm.expect(body.response).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('Has session_id', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('session_id');",
+                  "    pm.collectionVariables.set('session_id', body.session_id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"What is the current balance for account ACC001?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "ACC001 (Alice Johnson) has $1,200.50 balance but requires $2,500 minimum for Premium Checking. Expect penalty warning."
+          },
+          "response": [
+            {
+              "name": "Expected Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"prompt\": \"What is the current balance for account ACC001?\"}"
+                },
+                "url": {"raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""]}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"response\": \"The current balance for account ACC001 is $1,200.50 USD. This is a Premium Checking account with a minimum balance requirement of $2,500.00. The account is currently BELOW the minimum balance. A monthly penalty fee of $25.00 will be applied.\",\n    \"session_id\": \"a1b2c3d4-...\",\n    \"agent_runtime_arn\": \"arn:aws:bedrock-agentcore:us-east-2:...\",\n    \"mode\": \"aws_bedrock_agentcore\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Balance — ACC002 (Bob, compliant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has response field', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('response');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"What is the balance for ACC002 and is there any penalty?\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "ACC002 (Bob Smith) has $820.00 balance, minimum is $500. Should be compliant — no penalty."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Balance — ACC003 (Carol, Savings)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"Check the balance and minimum balance requirement for account ACC003\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "ACC003 (Carol White) has $1,100.50 in Savings, minimum is $300. Compliant."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Account Details Queries",
+      "item": [
+        {
+          "name": "Get Details — ACC001 (Alice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains owner info', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.response).to.include('Alice');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"Who is the owner of account ACC001? Show me their contact details.\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Retrieves owner name, email, phone, address, and member since date for ACC001."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Details — ACC002 (Bob)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"Get the account details for ACC002 including email and phone number\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Combined Queries",
+      "item": [
+        {
+          "name": "Balance + Details — ACC001",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is comprehensive', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.response.length).to.be.greaterThan(50);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"Give me a full account summary for ACC001: balance, compliance status, and owner information\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Triggers both get_account_balance and get_account_details tools in a single LangGraph run."
+          },
+          "response": []
+        },
+        {
+          "name": "Penalty Check — All Accounts",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"Which accounts are at risk of penalty fees? Check ACC001, ACC002, and ACC003\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Multi-account compliance check. The agent will call get_account_balance for each account."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Multi-Turn Conversation",
+      "item": [
+        {
+          "name": "Turn 1 — Ask about ACC001",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('session_id', body.session_id);",
+                  "console.log('Session ID saved:', body.session_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"What is the balance for ACC001?\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "First turn — saves session_id for follow-up."
+          },
+          "response": []
+        },
+        {
+          "name": "Turn 2 — Follow-up (same session)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"Now show me the owner details for that same account\",\n    \"session_id\": \"{{session_id}}\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Second turn using the same session_id from Turn 1."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Cases",
+      "item": [
+        {
+          "name": "Invalid Account ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 (agent handles gracefully)', () => pm.response.to.have.status(200));",
+                  "pm.test('Response mentions not found', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.response.toLowerCase()).to.satisfy(",
+                  "        s => s.includes('not found') || s.includes('invalid') || s.includes('unable')",
+                  "    );",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"What is the balance for account ACC999?\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "ACC999 does not exist. The agent should return a graceful error message."
+          },
+          "response": []
+        },
+        {
+          "name": "Empty Prompt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Has error field', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Empty prompt should return HTTP 400."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

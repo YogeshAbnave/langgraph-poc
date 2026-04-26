@@ -1,0 +1,9 @@
+langgraph
+langchain-aws
+langchain-core
+langchain_community
+boto3
+pyjwt>=2.10.1
+opentelemetry-instrumentation-langchain
+bedrock-agentcore
+bedrock-agentcore-starter-toolkit
