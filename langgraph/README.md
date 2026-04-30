@@ -388,4 +388,5 @@ agentcore destroy
 - `lambda:InvokeFunction` — for tool Lambdas
 - CloudWatch Logs write access
 
-
+### API Gateway Invoker Role
+- `bedrock-agentcore:InvokeAgentRuntime`

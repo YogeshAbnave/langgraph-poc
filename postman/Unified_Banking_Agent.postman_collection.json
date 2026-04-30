@@ -1,0 +1,727 @@
+{
+  "info": {
+    "name": "Unified Banking Agent — Supervisor + Worker",
+    "description": "Complete test collection for the unified multi-agent architecture.\n\n## Architecture\nClient → API Gateway → api-gateway-invoker Lambda → Supervisor Agent → Worker Agent (LangGraph) → Lambda Tools\n\n## How to use\n1. Run '0. Get Cognito Token' first — it auto-sets {{bearer_token}} for all other requests\n2. Run any banking query request\n3. The Supervisor routes banking queries to the Worker Agent automatically\n\n## Endpoints\n- API Gateway: https://bbcwr3ugt1.execute-api.us-east-2.amazonaws.com\n- Supervisor ARN: arn:aws:bedrock-agentcore:us-east-2:573054851765:runtime/supervisor_agent-62XPoT3Z6R\n- Worker ARN: arn:aws:bedrock-agentcore:us-east-2:573054851765:runtime/agentcore_langgraph_runtime-P52MOf7Fmi",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://bbcwr3ugt1.execute-api.us-east-2.amazonaws.com",
+      "type": "string",
+      "description": "API Gateway base URL"
+    },
+    {
+      "key": "bearer_token",
+      "value": "",
+      "type": "string",
+      "description": "Cognito JWT — auto-set by '0. Get Cognito Token' request"
+    },
+    {
+      "key": "cognito_token_url",
+      "value": "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_xfJLjkmbV/oauth2/token",
+      "type": "string"
+    },
+    {
+      "key": "cognito_client_id",
+      "value": "5h7kbhrccvpqsonfvl4gfm31v4",
+      "type": "string",
+      "description": "Cognito user_client_id (for end-user auth)"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-set after first request for multi-turn conversations"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth — Get Cognito Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Auto-extract and store the Bearer token",
+              "var jsonData = pm.response.json();",
+              "if (jsonData.AccessToken) {",
+              "    pm.collectionVariables.set('bearer_token', jsonData.AccessToken);",
+              "    console.log('Token stored. Expires in:', jsonData.ExpiresIn, 'seconds');",
+              "    pm.test('Token obtained successfully', function() {",
+              "        pm.expect(jsonData.AccessToken).to.be.a('string');",
+              "        pm.expect(jsonData.AccessToken.length).to.be.greaterThan(100);",
+              "    });",
+              "} else {",
+              "    console.error('No AccessToken in response:', JSON.stringify(jsonData));",
+              "    pm.test('Token obtained', function() { pm.expect.fail('No AccessToken returned'); });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-amz-json-1.1"
+          },
+          {
+            "key": "X-Amz-Target",
+            "value": "AWSCognitoIdentityProviderService.InitiateAuth"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"5h7kbhrccvpqsonfvl4gfm31v4\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"testuser\",\n    \"PASSWORD\": \"AgentCoreTest1!\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://cognito-idp.us-east-2.amazonaws.com/",
+          "protocol": "https",
+          "host": ["cognito-idp", "us-east-2", "amazonaws", "com"],
+          "path": ["/"]
+        },
+        "description": "Gets a Cognito JWT for testuser.\n\nAuto-stores the token in {{bearer_token}} collection variable.\nRun this FIRST before any other request.\n\nCredentials:\n- Username: testuser\n- Password: AgentCoreTest1!\n- Client ID: 5h7kbhrccvpqsonfvl4gfm31v4 (user_client_id)"
+      },
+      "response": []
+    },
+    {
+      "name": "1. Security — No Token (expect 403)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Request rejected without token (403)', function() {",
+              "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+              "});",
+              "console.log('Status:', pm.response.code, '— Expected 401 or 403');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"What is the balance for ACC001?\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Sends a request WITHOUT a Bearer token.\nExpected result: 401 or 403 Unauthorized.\n\nThis verifies the Cognito JWT inbound auth on the Supervisor Agent is working correctly."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Balance Query — ACC001 (Premium Checking)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "",
+              "// Store session_id for multi-turn tests",
+              "if (jsonData.session_id) {",
+              "    pm.collectionVariables.set('session_id', jsonData.session_id);",
+              "}",
+              "",
+              "pm.test('Response contains balance info', function() {",
+              "    var body = JSON.stringify(jsonData).toLowerCase();",
+              "    pm.expect(body).to.include('1200');",
+              "});",
+              "",
+              "pm.test('Routed to worker_agent', function() {",
+              "    pm.expect(jsonData.routed_to || jsonData.mode || '').to.satisfy(function(v) {",
+              "        return v.includes('worker') || v.includes('agent');",
+              "    });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"What is the current balance for account ACC001? Is it compliant with the minimum balance requirement?\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Query the balance for ACC001 (Alice Johnson — Premium Checking).\n\nExpected data:\n- Balance: $1,200.50\n- Minimum required: $2,500.00\n- Compliant: NO\n- Penalty: $25.00/month\n\nFlow: API Gateway → Invoker Lambda → Supervisor → Worker (LangGraph) → get-account-balance Lambda"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Account Details — ACC001 (Owner Info)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "",
+              "pm.test('Response contains owner name', function() {",
+              "    var body = JSON.stringify(jsonData).toLowerCase();",
+              "    pm.expect(body).to.include('alice');",
+              "});",
+              "",
+              "pm.test('Response contains email', function() {",
+              "    var body = JSON.stringify(jsonData).toLowerCase();",
+              "    pm.expect(body).to.include('alice.johnson');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Who is the owner of account ACC001? Give me their full contact details including email, phone and address.\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Query owner details for ACC001.\n\nExpected data:\n- Owner: Alice Johnson\n- Email: alice.johnson@example.com\n- Phone: +1-555-0101\n- Address: 123 Main St, Springfield, IL 62701\n- Member since: 2018-03-15\n\nFlow: Supervisor → Worker → get-account-details Lambda"
+      },
+      "response": []
+    },
+    {
+      "name": "4. Full Summary — ACC001 (Balance + Details)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "",
+              "pm.test('Response contains both balance and owner info', function() {",
+              "    var body = JSON.stringify(jsonData).toLowerCase();",
+              "    pm.expect(body).to.include('1200');",
+              "    pm.expect(body).to.include('alice');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Give me a complete summary for account ACC001 — include the current balance, compliance status, penalty exposure, and full owner contact information.\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Full summary query — forces the Worker Agent to call BOTH Lambda tools.\n\nExpected: LangGraph calls get-account-balance AND get-account-details, then synthesises a combined answer.\n\nACC001 — Alice Johnson\n- Balance: $1,200.50 (NON-COMPLIANT, $25 penalty)\n- Email: alice.johnson@example.com\n- Member since: 2018-03-15"
+      },
+      "response": []
+    },
+    {
+      "name": "5. Balance Query — ACC002 (Standard Checking, Compliant)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "",
+              "pm.test('Response contains ACC002 balance', function() {",
+              "    var body = JSON.stringify(jsonData).toLowerCase();",
+              "    pm.expect(body).to.include('820');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"What is the balance for account ACC002? Is it above the minimum balance requirement?\",\n  \"account_id\": \"ACC002\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Query balance for ACC002 (Bob Smith — Standard Checking).\n\nExpected data:\n- Balance: $820.00\n- Minimum required: $500.00\n- Compliant: YES\n- Penalty: $0.00"
+      },
+      "response": []
+    },
+    {
+      "name": "6. Account Details — ACC002 (Bob Smith)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "pm.test('Contains Bob Smith', function() {",
+              "    pm.expect(JSON.stringify(jsonData).toLowerCase()).to.include('bob');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Who owns account ACC002? When did they become a member?\",\n  \"account_id\": \"ACC002\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Owner details for ACC002.\n\nExpected:\n- Owner: Bob Smith\n- Email: bob.smith@example.com\n- Member since: 2020-07-22"
+      },
+      "response": []
+    },
+    {
+      "name": "7. Full Summary — ACC003 (Savings Account)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "pm.test('Contains ACC003 data', function() {",
+              "    var body = JSON.stringify(jsonData).toLowerCase();",
+              "    pm.expect(body).to.include('1100');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Give me a full account summary for ACC003 including balance, compliance status, and owner details.\",\n  \"account_id\": \"ACC003\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Full summary for ACC003 (Carol White — Savings).\n\nExpected:\n- Balance: $1,100.50\n- Minimum: $300.00\n- Compliant: YES\n- Owner: Carol White\n- Email: carol.white@example.com"
+      },
+      "response": []
+    },
+    {
+      "name": "8. Penalty Check — Which accounts have penalties?",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Check account ACC001 — what is the penalty exposure and monthly fee if the balance stays below the minimum?\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Penalty-focused query for ACC001.\n\nExpected: $25.00 monthly fee because balance ($1,200.50) is below minimum ($2,500.00) for Premium Checking."
+      },
+      "response": []
+    },
+    {
+      "name": "9. Multi-Turn — Turn 1 (Start Session)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "",
+              "// Store session_id for Turn 2",
+              "var sessionId = jsonData.session_id || jsonData.sessionId;",
+              "if (sessionId) {",
+              "    pm.collectionVariables.set('session_id', sessionId);",
+              "    console.log('Session ID stored:', sessionId);",
+              "} else {",
+              "    // Generate a UUID for the session",
+              "    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {",
+              "        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);",
+              "        return v.toString(16);",
+              "    });",
+              "    pm.collectionVariables.set('session_id', uuid);",
+              "    console.log('Generated session ID:', uuid);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"What is the balance for account ACC001?\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Turn 1 of a multi-turn conversation.\nStores the session_id for Turn 2.\n\nRun this BEFORE '9b. Multi-Turn — Turn 2'."
+      },
+      "response": []
+    },
+    {
+      "name": "10. Multi-Turn — Turn 2 (Follow-up, same session)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "pm.test('Follow-up answered', function() {",
+              "    pm.expect(jsonData.result || jsonData.response || '').to.be.a('string').and.have.length.greaterThan(10);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Now tell me the owner details for that same account — name, email and phone number.\",\n  \"account_id\": \"ACC001\",\n  \"actor_id\": \"testuser\",\n  \"session_id\": \"{{session_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Turn 2 — follow-up in the same session.\nUses {{session_id}} set by Turn 1.\n\nThe Worker Agent has memory (STM) so it knows the context from Turn 1.\nExpected: Returns Alice Johnson's contact details."
+      },
+      "response": []
+    },
+    {
+      "name": "11. Supervisor Direct — General Question (no Worker)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));",
+              "pm.test('Answered by supervisor directly', function() {",
+              "    var routed = jsonData.routed_to || '';",
+              "    console.log('Routed to:', routed);",
+              "    pm.expect(jsonData.result || jsonData.response || '').to.be.a('string').and.have.length.greaterThan(5);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"What is the difference between a savings account and a checking account?\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "General banking question — no specific account ID.\n\nThe Supervisor handles this DIRECTLY without calling the Worker Agent.\nExpected: routed_to = 'supervisor_direct'\n\nThis tests the Supervisor's intent routing logic."
+      },
+      "response": []
+    },
+    {
+      "name": "12. All Accounts — Compare Balances",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "console.log('Response:', JSON.stringify(jsonData, null, 2));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Check the balance and compliance status for account ACC002. Is Bob Smith's account in good standing?\",\n  \"account_id\": \"ACC002\",\n  \"actor_id\": \"testuser\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": ["/"]
+        },
+        "description": "Compliance check for ACC002.\n\nExpected: Balance $820 > minimum $500, so COMPLIANT, no penalty."
+      },
+      "response": []
+    }
+  ]
+}

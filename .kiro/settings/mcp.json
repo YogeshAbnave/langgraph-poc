@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "power-aws-agentcore-agentcore-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "awslabs.amazon-bedrock-agentcore-mcp-server@latest"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "UV_NO_PROGRESS": "1"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

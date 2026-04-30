@@ -1,0 +1,31 @@
+default_agent: supervisor_agent
+agents:
+  supervisor_agent:
+    name: supervisor_agent
+    entrypoint: app/SupervisorAgent/main.py
+    platform: linux/arm64
+    container_runtime: none
+    aws:
+      execution_role: arn:aws:iam::573054851765:role/AmazonBedrockAgentCoreSDKRuntime-us-east-2-supervisor
+      execution_role_auto_create: false
+      account: '573054851765'
+      region: us-east-2
+      ecr_repository: 573054851765.dkr.ecr.us-east-2.amazonaws.com/bedrock-agentcore-supervisor_agent
+      ecr_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+    bedrock_agentcore:
+      agent_id: supervisor_agent-62XPoT3Z6R
+      agent_arn: arn:aws:bedrock-agentcore:us-east-2:573054851765:runtime/supervisor_agent-62XPoT3Z6R
+      agent_session_id: null
+    codebuild:
+      project_name: bedrock-agentcore-supervisor_agent-builder
+      execution_role: null
+      source_bucket: null
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null

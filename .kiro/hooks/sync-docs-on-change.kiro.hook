@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Sync Docs on Source Change",
+  "description": "When any Python source file or requirements.txt changes, ask the agent to update README.md or LangGraph.md to reflect the changes.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.py",
+      "requirements.txt",
+      "**/*.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A source file was just edited. Review the changes and update the documentation accordingly. Check README.md and LangGraph.md — update whichever is most relevant to reflect the change. Keep the docs accurate and concise, only changing what's necessary."
+  }
+}

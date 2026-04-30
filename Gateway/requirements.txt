@@ -1,0 +1,3 @@
+boto3>=1.34.0
+boto3-stubs[cognito-idp,bedrock-agentcore,iam,sts,bedrock]>=1.34.0
+streamlit>=1.30.0

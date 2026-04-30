@@ -1,0 +1,11 @@
+{
+  "supervisor_arn": "arn:aws:bedrock-agentcore:us-east-2:573054851765:runtime/supervisor_agent-62XPoT3Z6R",
+  "supervisor_id": "supervisor_agent-62XPoT3Z6R",
+  "supervisor_role": "arn:aws:iam::573054851765:role/AmazonBedrockAgentCoreSDKRuntime-us-east-2-5130eca7b1",
+  "worker_arn": "arn:aws:bedrock-agentcore:us-east-2:573054851765:runtime/agentcore_langgraph_runtime-P52MOf7Fmi",
+  "region": "us-east-2",
+  "account": "573054851765",
+  "cognito_user_client_id": "5h7kbhrccvpqsonfvl4gfm31v4",
+  "cognito_agent_client_id": "2985jdh98eme3djr1mes2pt3bm",
+  "cognito_discovery_url": "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_xfJLjkmbV/.well-known/openid-configuration"
+}
